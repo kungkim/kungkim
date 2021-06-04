@@ -1,0 +1,607 @@
+--[[ 
+
+		 Game function script
+		  2019. 10th. July
+
+	Written by Detch aka Oops321
+]]
+
+print("\169230230230[\169250210210Vital\169230230230]: \169235200100\"game function\" script has been loaded.")
+
+function fws_add_wantedlist(id)
+	if ( sanrok.configure.fws_server and wanted_addID(id) ) then
+	
+	end
+end
+
+
+function get_weapons(id)
+slient[id].player.weapons = {};
+
+	for _, weapon_id in pairs(playerweapons(id)) do
+		if ( weapon_id ~= 50 ) then
+		
+		local ammoin, ammo = playerammo(id,weapon_id);
+		table.insert(slient[id].player.weapons,{weapon_id,ammoin,ammo});
+		
+		end
+		
+	end
+	
+end
+
+function empty_weapons(id)
+	
+	for _, weapon_id in pairs(playerweapons(id)) do
+		if ( weapon_id ~= 50 or itemtype(weapon_id,"slot") ~= 2) then
+		parse("setammo "..id.." "..weapon_id.." 0 0");
+		end
+		
+	end
+	
+end
+
+function strip_weapons(id)
+	
+	for _, weapon_id in pairs(playerweapons(id)) do
+		
+		if ( weapon_id == 50 or ( weapon_id == 78 and slient[id].addon.handcuff.state[1] == true ) ) then
+		else
+		parse("strip "..id.." "..weapon_id);
+		end
+		
+	end
+	
+end
+
+function drop_data(id, armor, pos, nvg, gas, defusekit)
+
+	local x, y;
+	 
+	 if pos then x, y = math.floor(slient[id].player.coordinate.x/32), math.floor(slient[id].player.coordinate.y/32) else x, y = player(id,"tilex"), player(id,"tiley"); end
+	
+	 if pos then parse("setpos "..id.." "..slient[id].player.coordinate.x.." "..slient[id].player.coordinate.y); end
+	
+	 if nvg then parse("spawnitem 59 "..x.." "..y); end
+	 if gas then parse("spawnitem 60 "..x.." "..y); end
+	 if defusekit then parse("spawnitem 56 "..x.." "..y); end
+	
+	 if armor and slient[id].player.armour > 200 then parse("spawnitem "..(slient[id].player.armour-122).." "..x.." "..y); end
+
+	for i = 1, #slient[id].player.weapons do
+	 parse("spawnitem "..slient[id].player.weapons[i][1].." "..x.." "..y.." "..slient[id].player.weapons[i][2].." "..slient[id].player.weapons[i][3]);
+	end
+ 
+ 
+end
+
+function get_player_data(id)
+	
+	
+	get_weapons(id);
+	slient[id].player.velocity = ( slient[id].addon.items.temp[1] > 1 ) and slient[id].player.velocity or player(id,"speedmod");
+	slient[id].player.armour = player(id,"armor");
+	slient[id].player.current_holding = player(id,"weapontype");
+	
+	slient[id].player.coordinate.x = player(id,"x");
+	slient[id].player.coordinate.y = player(id,"y");
+	return player(id,"nightvision"), player(id,"gasmask"), player(id,"defusekit");
+end
+
+function recover_player(id, armor, speed, pos, nvg, gas, defusekit)
+local x, y = math.floor(slient[id].player.coordinate.x/32), math.floor(slient[id].player.coordinate.y/32)
+	
+	if nvg then parse("spawnitem 59 "..x.." "..y); end
+	if gas then parse("spawnitem 60 "..x.." "..y); end
+	if defusekit then parse("spawnitem 56 "..x.." "..y); end
+	
+	if armor then parse("setarmor "..id.." "..slient[id].player.armour); end
+	if speed then parse("speedmod "..id.." "..slient[id].player.velocity); end
+	if pos then parse("setpos "..id.." "..slient[id].player.coordinate.x.." "..slient[id].player.coordinate.y); end
+
+	for i = 1, #slient[id].player.weapons do
+	 parse("equip "..id.." "..slient[id].player.weapons[i][1]);
+	 parse("setammo "..id.." "..slient[id].player.weapons[i][1].." "..slient[id].player.weapons[i][2].." "..slient[id].player.weapons[i][3]);
+	end
+ 
+ parse("setweapon "..id.." "..slient[id].player.current_holding);
+ 
+end
+
+
+--// CCTV Functions
+
+function sanrok_camera_loop()
+	if ( #player(0,"tableliving") > 0 ) then 
+	
+		for _, id in pairs(player(0,"tableliving")) do
+			
+			if ( slient[id] and slient[id].rooms.cctv.state ) then
+			parse("sv_stopsound \"sanrok_jail/ui/camera_loop.ogg\" "..id);
+			parse("sv_sound2 "..id.." \"sanrok_jail/ui/camera_loop.ogg\"");
+			end
+		
+		end
+	end
+timer(4000,"parse","lua sanrok_camera_loop()")
+end
+
+function sanrok_camera_effect(id,mode)
+
+	if ( mode ) then
+	slient[id].rooms.cctv.state = true
+
+	image_effect(0,slient[id].rooms.cctv.screen,"alpha0.3");
+	image_effect(0,slient[id].rooms.cctv.panel,"alpha0.7");
+	parse("flashplayer "..id.." 15");
+	parse("sv_sound2 "..id.." \"sanrok_jail/ui/camera_loop.ogg\"");
+	parse("sv_sound2 "..id.." \"sanrok_jail/ui/camera_ch"..math.random(3)..".ogg\"");
+	CCTV_box_texts(id)
+	remove_hud(id,108)
+	else
+	slient[id].rooms.cctv.state = false
+	
+	image_effect(0,{slient[id].rooms.cctv.screen,slient[id].rooms.cctv.panel},"alpha0.0");
+	parse("sv_stopsound \"sanrok_jail/ui/camera_loop.ogg\" "..id);
+	end
+
+end
+
+function sanrok_get_camera()
+	for _, e in pairs(entitylist()) do
+		
+		if ( ( entity(e.x,e.y,"name"):sub(1,4) == "CCTV" and entity(e.x,e.y,"name"):sub(5,5) ~= "G" ) and ( entity(e.x,e.y,"typename") == "Trigger_Use" or entity(e.x,e.y,"typename") == "Env_Sprite" ) ) then
+			if ( entity(e.x,e.y,"typename") == "Trigger_Use" ) then
+			local name, x, y, channel = entity(e.x,e.y,"name"):sub(6);
+			local under_score, equal_sign = entity(e.x,e.y,"trigger"):find("_");
+			equal_sign = entity(e.x,e.y,"trigger"):find("=");
+			x = entity(e.x,e.y,"trigger"):sub(1,under_score-1);
+			y = entity(e.x,e.y,"trigger"):sub(under_score+1, equal_sign-1);
+			
+			channel = tonumber(entity(e.x,e.y,"trigger"):sub(equal_sign+1));
+			-- msg("ADD Camera : \169230230230Channel: ["..channel.."] - \169200235200"..name.." | "..x.." "..y);
+			table.insert(smap.rooms.cctv[channel],{name, x, y});
+			
+			elseif ( entity(e.x,e.y,"typename") == "Env_Sprite" ) then
+			--[[
+				Properties Infomration
+				Name = CCTV_:Name:
+				Trigger = :marker x:,:marker y:
+				X, Y = TP X, Y
+				int8 = channel	
+			]]
+			
+			local name, channel, comma = entity(e.x,e.y,"name"):sub(6);
+			channel = tonumber(entity(e.x,e.y,"int8"))
+			local comma = entity(e.x,e.y,"trigger"):find(",");
+			
+			table.insert(smap.rooms.cctv[channel],{name, e.x, e.y, tonumber(entity(e.x,e.y,"trigger"):sub(1,comma-1)), tonumber(entity(e.x,e.y,"trigger"):sub(comma+1))});
+			-- msg("ADD Camera : \169200200200Channel: ["..channel.."] - \169235200200"..name.." | "..e.x.." "..e.y);
+			end
+		
+		end
+		
+	end
+CCTV_arrange_table(2)
+CCTV_Main_Text(2)
+end
+
+function CCTV_spawndummy(id)
+local team = player(id,"team")==1 and "t" or "ct";	
+	
+	if ( smap.rooms.cctv.dummy[id] ) then
+	image_effect(0,smap.rooms.cctv.dummy[id],"frame3","alpha1","pos"..player(id,"x")..","..player(id,"y")..","..player(id,"rot"),"hitzone3,-16,-16,32,32","frame3");	
+	else
+	table.insert(smap.rooms.cctv.dummy,id,image("<spritesheet:sys/cache/mods/fws_jail_0.2v/gfx/player/"..team..""..(tonumber(player(id,"look"))+1)..".png:32:32:<m>>",0,0,0));
+	image_effect(0,smap.rooms.cctv.dummy[id],"frame3","pos"..player(id,"x")..","..player(id,"y")..","..player(id,"rot"),"hitzone3,-16,-16,32,32","frame3");
+	end
+
+end
+
+function CCTV_player_action(id)
+	
+	if ( slient[id].rooms.cctv.state ) then
+	
+	get_player_data(id);
+	strip_weapons(id);
+	parse("setarmor "..id.." 206");
+	parse("speedmod "..id.." -100");
+	CCTV_spawndummy(id);
+	else
+	
+	image_effect(0,smap.rooms.cctv.dummy[id],"alpha0","hitzone0,0,0,0,0");
+	remove_hud(id,{101,102,103})
+	recover_player(id, true, true, true);
+	end
+	
+end
+
+function CCTV_death(id)
+
+	if ( slient[id].rooms.cctv.state ) then
+	sanrok_camera_effect(id,false)
+	CCTV_player_action(id)
+	end
+	
+end
+
+function CCTV_guider(id, x, y)
+	if ( entity(x,y,"exists") == true and entity(x,y,"name"):sub(1,4) == "CCTV" ) then
+	hudtxts(0,true,id,"220210120",108,"Press \169240240240[\169200255200E\169240240240]\169220210120 to use CCTV",425,430,1,0,13) 	
+	else
+	remove_hud(id,108);
+	end
+end
+
+function CCTV_box_texts(id)
+
+local channel = slient[id].rooms.cctv.channel;
+hudtxts(0,true,id,"160160105",101,"Press \169230230230[   \174gfx/Sanrok_jail/misc/icon_M1.png\169230230230]\169160160105 to exit.",425,350,1,0,10,"fadein300,0.6");
+hudtxts(0,true,id,"100255100",102,"< "..smap.rooms.cctv[channel[1]][channel[2]][1].." >",425,378,1,0,10,"fadein300,0.5","color500,230,255,230");
+local ntbl, xtbl = get_area_player(player(id,"tilex")-13, player(id,"tiley")-7, player(id,"tilex")+13, player(id,"tiley")+7), {};
+	for _, aid in pairs(ntbl) do
+		
+		if not( slient[aid].rooms.cctv.state ) then
+		table.insert(xtbl,aid);
+		end
+		
+	end
+hudtxts(0,true,id,"255100100",103,(#xtbl),435,412,2,0,10,"fadein300,0.5","color500,255,230,230");
+
+end
+
+function CCTV_arrange_table(key)
+local keys = {}
+for k in pairs(smap.rooms.cctv[key]) do table.insert(keys, k) end
+table.sort(keys, function(a, b) return smap.rooms.cctv[key][a][2] < smap.rooms.cctv[key][b][2] end)
+
+local copy = {}
+
+	for i = 1, #keys do
+	copy[i] = unpack({smap.rooms.cctv[key][keys[i]]});
+	end
+	
+smap.rooms.cctv[key] = copy;
+end
+
+
+--// CCTV functions end here.
+
+
+function Vent_effect(tbl)
+local i = image("<tile:94>",tbl[1]*32,tbl[2]*32,0)
+image_effect(0,i,"tmove"..math.random(100,300)..","..((tbl[1]+tbl[3])*32)..","..((tbl[2]+tbl[4])*32),"talpha30000,0.0")
+parse("sv_soundpos \"materials/metal"..math.random(3)..".wav\" "..(tbl[1]*32+16).." "..(tbl[2]*32+16))
+
+end
+
+function Vent_Interact(id,x,y)
+	if ( entity(x,y,"name") == "vent_u" ) then
+	parse("triggerposition "..x.." "..y)
+	local th = entity(x,y,"int1");
+		if ( th == 0 ) then
+		th = { x, y-1, 0, -1 }
+		elseif ( th == 1 ) then
+		th = { x , y+1, 0, 1 }
+		elseif ( th == 2 ) then
+		th = { x-1 , y, -1 , 0 }
+		elseif ( th == 3 ) then
+		th = { x+1 , y, 1, 0 }
+		end
+	Vent_effect(th)
+	end
+
+end
+
+--// Vent functions end here
+
+function Random_loot(x,y,ltbl,ammo1, ammo2)
+ local loot, rloot = { 
+	[1] = {2, 2, 2, 2, 2, 2, 5, 5, 5, 69, 52, 52, 57, 57, 57, 57, 66, 0, 0, 0, 0, 0, 0, 0, 0, "ITEM4", "ITEM2", "ITEM2"},
+	[2] = {0,0,0,0,0,0,0,0,30,3,3,3,22,10,10,73,77,"ITEM3","ITEM2"},
+};
+ rloot = loot[ltbl][math.random(1,#loot[ltbl])];
+		
+	if ( type(rloot) == "string" ) then
+	 rloot = tonumber(rloot:match("%d+"));
+	 spawnitem(rloot,x,y);
+		
+	elseif ( type(rloot) == "number" and rloot ~= 0 ) then
+	 parse("spawnitem "..rloot.." "..x.." "..y.." "..ammo1.." "..ammo2);
+		
+	end
+		
+end
+
+function Break_Random(x,y,id)
+	if ( entity(x,y,"name") == "Random_Box" ) then
+	Random_loot(x,y,1,0,math.random(2,20));
+	end
+end
+
+function bracket_message_location(id, x, y) -- usebutton
+ local trg, des = entity(x,y,"trigger");
+ des = string.match(trg, "%(%d+%A%d+%)");
+	
+	if ( des ) then	
+	 local nx, ny, content  = string.match(des,"%d+"), string.match(des,"%d+%)")
+	 ny = string.match(ny,"%d+");
+	 
+	 content = string.gsub(entity(nx,ny,"str0"),"?169","\169");
+	 
+	 pm_action(id, content, 0, true) 
+	end
+	
+end
+
+function trigger_message(trg)
+	
+	if trg:find("TMSG") then
+	 local des = string.match(trg, "%(%d+%A%d+%s%d+%a%d+%)"); --TMSG(location player x"."y" "message entity location x"n"y)
+	 local px, py, nx, ny, content;
+	 
+	 px, py = tonumber(string.match(des,"%d+")), string.match(des,"%d+%s");
+	 nx, ny = tonumber(string.match(des,"%s%d+")), string.match(des,"%a%d+");
+	 
+	 py = tonumber(string.match(py,"%d+"));
+	 ny = tonumber(string.match(ny,"%d+"));
+	 
+	 content = string.gsub(entity(nx,ny,"str0"),"?169","\169");
+	 local ptbl = get_area_player(px, py, px, py);
+	 
+		for _, id in pairs(ptbl) do
+		pm_action(id, content, 0, true);
+		end
+		
+	end
+	
+end
+function Toilet_item(id,x,y)
+local con, percent = entity(x,y,"name"):find("toiuse")
+percent = math.random(100)
+
+	if con then 
+	local tbl = false;	
+		
+		if #smap.toilets > 0 then
+			
+			for i = 1, #smap.toilets do
+				
+				if ( smap.toilets[i][1] == x and smap.toilets[i][2] == y ) then
+				 tbl = true;
+				 break;
+				end
+				
+			end
+			
+			if not tbl then
+			table.insert(smap.toilets,{x,y})
+			end
+			
+		else
+		table.insert(smap.toilets,{x,y})
+		end
+		
+
+		if not(tbl) and percent>=0 and percent <=10  then
+		local toi_items, d_item = {1,1,3,3,6,6,6,23,65,"NONE","NONE","NONE","NONE","NONE","NONE"};
+		d_item = toi_items[math.random(1,#toi_items)];
+		local direction = entity(x,y,"int1");
+						
+			if ( direction == 0 ) then
+			direction = 180;
+			elseif ( direction == 1 ) then
+			direction = 0;
+			elseif ( direction == 2 ) then
+			direction = 90;
+			elseif ( direction == 3 ) then
+			direction = 270;
+			end
+						
+		local m=true;	
+		
+			if #smap.toilets > 0 then
+				
+				for i = 1, #smap.toilets do
+					
+					if ( smap.toilets[i][1] == x and smap.toilets[i][2] == y ) then
+					m = false;
+					break;
+					end
+					
+				end
+
+			end
+			
+			if m then
+				
+				if ( type(d_item) ~= 'string' ) then	
+				
+					parse("spawnprojectile 0 "..d_item.." "..(x*32+16).." "..(y*32+16).." 48 "..direction);
+					parse("effect \"colorsmoke\" "..(x*32+16).." "..(y*32+16).." 3 5 150 150 150")
+					
+					
+				end
+				
+			end
+				
+		end
+		
+	end
+	
+end
+
+function Disable_lights(mode)
+	
+	if ( mode ) then
+	smap.light = {};	
+		for _, e in pairs(entitylist(33)) do -- Light entities
+			
+			if ( entity(e.x,e.y,"state") == false and entity(e.x,e.y,"trigger") == "1" ) then
+			 table.insert(smap.light,{e.x,e.y});
+			end
+			
+		end
+		
+		for _, e in pairs(entitylist(22)) do
+			
+			if ( entity(e.x,e.y,"state") == false and entity(e.x,e.y,"int8") == 1 ) then
+			 table.insert(smap.light,{e.x,e.y});
+			end
+			
+		end
+		
+		
+		for _, e in pairs(entitylist(23)) do
+			
+			if ( entity(e.x,e.y,"state") == false and entity(e.x,e.y,"str0") == "sfx/Sanrok_jail/ambient/office_room_tone_02.ogg" ) then
+			 table.insert(smap.light,{e.x,e.y});
+			end
+			
+		end
+		
+	parse("trigger toggle_light,L_effect");
+	Disable_lights();
+	else
+	 local loop_state = false;
+		
+		for i = 1, #smap.light do
+			
+			if smap.light[i] ~= nil then
+			 
+			 parse("triggerposition "..smap.light[i][1].." "..smap.light[i][2]);
+			 table.remove(smap.light,i);
+				
+			 if smap.light[i+1] ~= nil then loop_state = true; else parse("trigger cover_darkness"); end
+				
+			 break;
+			 
+			end 
+		
+		end
+			
+		if loop_state then
+		timer(5,"parse","lua Disable_lights()");
+		end
+		
+	end
+	
+end
+
+function Remove_player_bomb(id)	
+	if not id then
+	
+		for _, nid in pairs(player(0,"tableliving")) do
+		 Remove_player_bomb(nid);
+		end
+		
+	else
+	
+		if player(id,"bomb") then
+		 get_player_data(id);
+		 parse("mp_autoteambalance 0");
+		 parse("spawnplayer "..id.." 0 0");	
+		 recover_player(id, true, false, true);
+		 parse("mp_autoteambalance 1");
+		return true;
+		end
+		
+	end
+
+return false;
+end
+
+function Plant_bomb(id,x,y,key)
+ 
+ key = tonumber(key);
+ smap.bomb_spot[key][1], smap.bomb_spot[key][2] = x, y;
+ smap.bomb_spot[key][10] = sanrok.configure.bomb_timer;
+ smap.bomb_spot[key][9] = ((smap.bomb_spot[key][10]*10)*5)*0.05;
+ 
+ smap.bomb_spot[key][5] = true
+ smap.bomb_spot[key][11] = {image("gfx/sanrok_jail/weapons/c4_amaguya.png",x*32+17,y*32+17,0),image("gfx/sanrok_jail/weapons/c4_amaguya.png",x*32+16,y*32+16,0),image("gfx/sprites/flare3.bmp",0,0,1), image("<light>",0,0,1)}
+ parse("trigger "..smap.bomb_spot[key][7]);
+ parse("sv_soundpos \"sanrok_jail/weapons/c4_plant_quiet.ogg\" "..(player(id,"x")).." "..player(id,"y"))
+ image_effect(0,smap.bomb_spot[key][11][1],"shadow1","color0,0,0","alpha0.5")
+ image_effect(0,smap.bomb_spot[key][11][3],"color255,0,0","alpha0.0","pos"..(x*32+16)..","..(y*32+16)..",0","blend1","scale0.5,0.5")
+ image_effect(0,smap.bomb_spot[key][11][4],"color255,0,0","pos"..(x*32+16)..","..(y*32+16)..",0","scale0,0")
+
+end
+
+function Bomb_Effects(key, mode)
+	
+	if mode == 0 then -- Blinking effect
+	 image_effect(0,{smap.bomb_spot[key][11][3],smap.bomb_spot[key][11][4]},"scale0.6,0.6","alpha0.7","talpha300,0.0","tscale300,0.0,0.0")
+	 parse("sv_soundpos \"weapons/c4.wav\" "..(smap.bomb_spot[key][1]*32+16).." "..(smap.bomb_spot[key][2]*32+16))
+	
+	elseif mode == 1 then -- Before detonation
+	 timer(350,"tmp_c4");
+		function tmp_c4()
+		 image_effect(0,{smap.bomb_spot[key][11][3],smap.bomb_spot[key][11][4]},"scale0.6,0.6","alpha0.7","color255,255,200","talpha3000,0.0")
+		 parse("sv_soundpos \"weapons/mine_charge.wav\" "..(smap.bomb_spot[key][1]*32+16).." "..(smap.bomb_spot[key][2]*32+16))
+		 tmp_c4 = nil;
+		end
+	elseif mode == 2 then -- Explosion effect
+	 parse("explosion "..(smap.bomb_spot[key][1]*32+16).." "..(smap.bomb_spot[key][2]*32+16).." 100 0 0")
+	 image_effect(0,{smap.bomb_spot[key][11][1],smap.bomb_spot[key][11][2],smap.bomb_spot[key][11][3],smap.bomb_spot[key][11][4]},"freeimage");
+	 smap.bomb_spot[key][11] =
+	 {
+		image("<spritesheet:gfx/explosion.png:64:64>",0,0,3),
+		image("<spritesheet:gfx/explosion.png:64:64>",0,0,3),
+		image("<spritesheet:gfx/explosion.png:64:64>",0,0,3),
+		image("<spritesheet:gfx/explosion.png:64:64>",0,0,3),
+		image("<spritesheet:gfx/explosion.png:64:64>",0,0,3),
+		image("<light>",0,0,3),
+	 }
+	 image_effect(0,smap.bomb_spot[key][11][6],"pos"..(smap.bomb_spot[key][1]*32+16)..","..(smap.bomb_spot[key][2]*32+16)..",0","scale1.2,1.2","color255,200,100","tscale1000,0.0,0.0")
+	 image_effect(0,{smap.bomb_spot[key][11][1],smap.bomb_spot[key][11][2],smap.bomb_spot[key][11][3],smap.bomb_spot[key][11][4],smap.bomb_spot[key][11][5]},"tanimate20,2","blend1","talpha700,0.0","pos"..(smap.bomb_spot[key][1]*32+16)..","..(smap.bomb_spot[key][2]*32+16)..","..math.random(0,359))
+	 imagescale(smap.bomb_spot[key][11][1],10,10);
+		
+		for i = 2, 5 do
+		local scale = math.random(2,8);
+		 image_effect(0,smap.bomb_spot[key][11][i],"pos"..((smap.bomb_spot[key][1]-(math.random(-6,6)))*32+16)..","..((smap.bomb_spot[key][2]-(math.random(-6,6)))*32+16)..","..math.random(0,359),"scale"..scale..","..scale)
+		end
+		
+			if ( #get_area_player(smap.bomb_spot[key][1]-15, smap.bomb_spot[key][2]-15, smap.bomb_spot[key][1]+15, smap.bomb_spot[key][2]+15)~=0 ) then
+			
+				for _, aid in pairs(get_area_player(smap.bomb_spot[key][1]-15, smap.bomb_spot[key][2]-15, smap.bomb_spot[key][1]+15, smap.bomb_spot[key][2]+15)) do -- Damaging, Shaking effect
+				 local shake_amount, exp_dmg = (math.floor(-(((math.sqrt(((smap.bomb_spot[key][1]*32+16) - player(aid,"x"))^2 + ((smap.bomb_spot[key][2]*32+16) - player(aid,"y"))^2))/250)*10)+41))
+				 parse("shake "..aid.." "..shake_amount);
+				 exp_dmg = shake_amount*2.8;
+				 
+					if ( player(aid,"health")-exp_dmg <= 0 ) then
+					 parse("customkill 0 \"Bomb explosion\" "..aid);
+					else
+					 parse("sethealth "..aid.." "..(player(aid,"health")-exp_dmg))
+					 parse("sv_soundpos \"player/hit"..math.random(3)..".wav\" "..(player(aid,"x")).." "..player(aid,"y"))
+					end
+				end
+				
+			end
+		parse('effect "fire" '.. (smap.bomb_spot[key][1]*32+16) ..' '.. (smap.bomb_spot[key][2]*32+16) ..' 100 250')
+		parse('effect "fire" '.. (smap.bomb_spot[key][1]*32+16) ..' '.. (smap.bomb_spot[key][2]*32+16) ..' 100 450')
+		parse('effect "smoke" '.. (smap.bomb_spot[key][1]*32+16) ..' '.. (smap.bomb_spot[key][2]*32+16) ..' 100 450')
+		parse('effect "smoke" '.. (smap.bomb_spot[key][1]*32+16) ..' '.. (smap.bomb_spot[key][2]*32+16) ..' 100 100')
+		--[[
+			I guess this could be heavy so just keeping it.
+		for rot = 0, 359 do
+		local x, y = smap.bomb_spot[key][1]*32+16, smap.bomb_spot[key][2]*32+16;
+			if ( rot%15 == 0 and math.random(4) == 1 )then
+				
+				for i = 6,96,1 do
+				parse('effect "smoke" '.. x+math.floor(3*math.cos(Angle(rot))*i) ..' '.. y+math.floor(3*math.sin(Angle(rot))*i) ..' 1 0')
+				end
+
+			end
+		end
+		]]
+	 parse("sv_soundpos \"weapons/c4_explode.wav\" "..(smap.bomb_spot[key][1]*32+16).." "..(smap.bomb_spot[key][2]*32+16))
+	 
+	 parse("trigger "..smap.bomb_spot[key][8]);
+	 
+	 smap.bomb_spot[key][5], smap.bomb_spot[key][6] = false, true;
+	end
+	
+end
+
+
